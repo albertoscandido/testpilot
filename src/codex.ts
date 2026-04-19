@@ -3,12 +3,14 @@ import fs from "fs";
 import { performance } from "perf_hooks";
 import { ICompletionModel } from "./completionModel";
 import { trimCompletion } from "./syntax";
+import 'dotenv/config';
 
 const defaultPostOptions = {
   max_tokens: 100, // maximum number of tokens to return
   temperature: 0, // sampling temperature; higher values increase diversity
-  n: 5, // number of completions to return
+  n: 5, // number of completions to return - deprecreated
   top_p: 1, // no need to change this
+  model: "gpt-5.4" // gpt-4.1 - gpt-5.2 - gpt-5.4...
 };
 export type PostOptions = Partial<typeof defaultPostOptions>;
 
@@ -73,14 +75,19 @@ export class Codex implements ICompletionModel {
           parameters: {
             max_new_tokens: options.max_tokens,
             temperature: options.temperature || 0.01, // StarCoder doesn't allow 0
-            n: options.n,
+            //n: options.n,
           },
         }
       : {
-          prompt,
-          ...options,
+          model: options.model,
+          instructions: "You are a helpful assistant. You must ONLY continue and complete the JavaScript test code snippet provided by the user. Do not rewrite any part of the code already provided. Do not add imports, comments, explanations, or any text outside the test code. Do not modify the structure of the test suite. Only generate the minimal continuation required to complete the test as the user expects. Never add new tests or change test behavior. The maximum allowed output is 100 completion tokens.",
+          input: prompt,
+          "temperature": options.temperature,
+          //"n": options.n,
+          "max_output_tokens": options.max_tokens
         };
 
+    // console.log(postOptions); // DEBUG REQUEST PROMPT
     const res = await axios.post(this.apiEndpoint, postOptions, { headers });
 
     performance.measure(
@@ -107,11 +114,16 @@ export class Codex implements ICompletionModel {
     if (this.isStarCoder) {
       completions.add(json.generated_text);
     } else {
-      for (const choice of json.choices || [{ text: "" }]) {
-        if (choice.finish_reason === "content_filter") {
-          numContentFiltered++;
-        }
-        completions.add(choice.text);
+      const outputs = json.output || [];
+
+      for (const output of outputs) {
+        console.log(output.content); // DEBUG RESPONSE
+        const parts = output.content || [];
+        const text = parts
+          .map((p: any) => p.text || "")
+          .join("");
+      
+        completions.add(text);
       }
     }
     if (numContentFiltered > 0) {
@@ -119,6 +131,7 @@ export class Codex implements ICompletionModel {
         `${numContentFiltered} completions were truncated due to content filtering.`
       );
     }
+
     return completions;
   }
 
