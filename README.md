@@ -1,157 +1,201 @@
-Note: This version of TestPilot has been archived. Please refer to the new version at [https://github.com/neu-se/testpilot2](https://github.com/neu-se/testpilot2).
+# TCC
+ 
+**O objetivo é comparar os resultados alcançados no estudo original de Schäfer et al. (2024)** — cujo modelo de maior destaque foi o ***gpt-3.5-turbo-0301*** — com os resultados obtidos por um modelo mais recentes da OpenAI, especificamente ***gpt-5.4***.
 
-# TestPilot
+---
 
-TestPilot is a tool for automatically generating unit tests for npm packages
-written in JavaScript/TypeScript using a large language model (LLM).
+## 🛠️ Diferenças em relação ao estudo original
+No estudo original, os modelos eram utilizados por meio do endpoint *v1/engines/{model}/completions*, que se tornou obsoleto e, portanto, não é compatível com modelos mais recentes.
 
-Note that TestPilot represents an early exploration in the use of LLMs for
-test generation, and has been made available in open source as a basis for
-research and exploration. For day-to-day use the test generation features
-in [Copilot Chat](https://docs.github.com/en/copilot/github-copilot-chat/about-github-copilot-chat)
-are likely to yield better results.
+Diante disso, foi necessário adotar o endpoint */v1/responses* recomendado pela OpenAI. Essa alteração traz implicações técnicas relevantes quando comparada à API anteriormente empregada, entre as quais se destacam:
 
-## Background
+A exigência de fornecer instruções explícitas ao modelo, já que o novo endpoint não se restringe à mera conclusão de textos, requerendo a definição clara do comportamento desejado por meio do prompt.
 
-TestPilot generates tests for a given function `f` by prompting the LLM with a
-skeleton of a test for `f`, including information about `f` embedded in code
-comments, such as its signature, the body of `f`, and examples usages of `f`
-automatically mined from project documentation. The model's response is then
-parsed and translated into a runnable unit test. Optionally, the test is run and
-if it fails the model is prompted again with additional information about the
-failed test, giving it a chance to refine the test.
+A inexistência do parâmetro n, que antes permitia gerar múltiplas respostas em uma única chamada à API.
 
-Unlike other systems for LLM-based test generation, TestPilot does not require
-any additional training or reinforcement learning, and no examples of functions
-and their associated tests are needed.
+A primeira diferença é contornada com a especificação do formato e do conteúdo esperado na resposta do modelo.
 
-A research paper describing TestPilot in detail is available on
-[arXiv](https://arxiv.org/abs/2302.06527) and [IEEExplore](https://ieeexplore.ieee.org/document/10329992).
+Quanto à ausência do parâmetro n, verifica-se uma diversidade amostral menor em relação ao estudo original. Contudo, como a temperatura foi mantida em 0 tanto no estudo original quanto nesta pesquisa, entende-se que o impacto dessa limitação sobre a variabilidade dos resultados é baixo.
+---
 
-## Requirements
+## ▶️ Como Executar
 
-In general, to be able to run TestPilot you need access to a Codex-style LLM
-with completion API. Set the `TESTPILOT_LLM_API_ENDPOINT` environment variable to
-the URL of the LLM API endpoint you want to use, and
-`TESTPILOT_LLM_AUTH_HEADERS` to a JSON object containing the headers you need to
-authenticate with the API.
+### 1. Criar arquivo .env
+Depois de baixar o projeto você deve criar o arquivo *.env* e replicar as variáveis contidas no *.env.example*.
 
-Typical values for these variables might be:
+A variável *TESTPILOT_LLM_API_ENDPOINT* contém a rota da Open IA que será chamada para criar os testes unitários. 
+No exemplo temos a rota que de fato é usada: https://api.openai.com/v1/responses
 
-- `TESTPILOT_LLM_API_ENDPOINT='https://api.openai.com/v1/engines/code-cushman-001/completions'`
-- `TESTPILOT_LLM_AUTH_HEADERS='{"Authorization": "Bearer <your API key>", "OpenAI-Organization": "<your organization ID>"}'`
+Ja a variável *TESTPILOT_LLM_AUTH_HEADERS*, dado o exemplo abaixo:
 
-Note, however, that you can run TestPilot in reproduction mode without access to
-the LLM API where model responses are taken from the output of a previous run;
-see below for details.
+TESTPILOT_LLM_AUTH_HEADERS='{"Authorization": "Bearer \<your API key\>", "OpenAI-Organization": "\<your organization ID\>", "OpenAI-Project": "\<your project ID\>"}'
 
-## Installation
+têm 3 espaços nos quais os valores devem ser preenchidos.
 
-You can install TestPilot from a pre-built package or from source.
+Você deve primeiro criar um projeto. Siga o tutorial:
+https://help.openai.com/en/articles/9186755-managing-your-work-in-the-api-platform-with-projects
 
-### Installing from a pre-built package
+Organization ID: https://platform.openai.com/settings/organization/general
 
-TestPilot is a available as a pre-built npm package, though it is not currently
-published to the npm registry. You can download a tarball from the repository
-and install it in the usual way. Note that this distribution only contains the
-core part of TestPilot, not the benchmarking harness.
+API Key: https://platform.openai.com/api-keys
 
-### Installing from source
+Project ID: Na interface da Open IA, siga o caminho no lado esquerdo, siga para Project -> General. Nessa página estará o project ID.
 
-The `src/` directory contains the source code for TestPilot, which is written in
-TypeScript and gets compiled into the `dist/` directory. Tests are in `test/`;
-the `benchmark/` directory contains a benchmarking harness for running TestPilot
-on multiple npm packages; and `ql/` contains the CodeQL queries used to analyze
-the results.
+### 2. Clone os repositórios usados para o estudo
 
-In the root directory of a checkout of this repository, run `npm build` to
-install dependencies and build the package.
+A estrutura usada para esse tutorial foi essa, é necessário esclarecer para ficar clara a execução dos comandos.
 
-You can also use `npm run build:watch` to automatically build anytime you make
-changes to the code. Note, however, that this will not automatically install
-dependencies, and also will not build the benchmarking harness.
-
-Use `npm run test` to run the tests. For convenience, this will also install
-dependencies and run a build.
-
-## Benchmarking
-
-If you install TestPilot from source, you can use the benchmarking harness to
-run TestPilot on multiple packages and analyze the results. This is not
-currently available if you install TestPilot from a pre-built package.
-
-### Running locally
-
-Basic usage is as follows:
-
-```sh
-node benchmark/run.js --outputDir <report_dir> --package <package_dir>
+```
+tcc/
+├── testpilot/      # repositório que contém o orquestrador
+├── repositories/   # contém as bibliotecas usadas no estudo
+└── outputs/        # resultados obtidos através do test pilot
 ```
 
-This generates tests for all functions exported by the package in
-`<package_dir>`, validates them, and writes the results to `<report_dir>`.
+## Bibliotecas utilizadas
+[dirty](https://github.com/felixge/node-dirty/tree/d7fb4d4ecf0cce144efa21b674965631a7955e61)  
+[delta](https://github.com/quilljs/delta/tree/5ffb853d645aa5b4c93e42aa52697e2824afc869)  
+[node-geo-point](https://github.com/rainder/node-geo-point/tree/c839d477ff7a48d1fc6574495cbbc6196161f494)  
+[countries-and-timezones](https://github.com/manuelmhtr/countries-and-timezones/tree/e34cb4b6832795cbac8d44f6f9c97eb1038b831b)  
+[graceful-fs](https://github.com/isaacs/node-graceful-fs/tree/c1b377782112ae0f25b2abe561fbbea6cfb6f876)  
+[q](https://github.com/kriskowal/q/tree/6bc7f524eb104aca8bffde95f180b5210eb8dd4b)  
+[zip-a-folder](https://github.com/maugenst/zip-a-folder/tree/5089113647753d5086ea20f052f9d29840866ee1)  
+[bluebird](https://github.com/petkaantonov/bluebird/tree/6c8c069c34829557abfaca66d7f22383b389a4b5)  
+[Complex.js](https://github.com/infusion/Complex.js/tree/d995ca105e8adef4c38d0ace50643daf84e0dd1c)  
+[js-sdsl](https://github.com/js-sdsl/js-sdsl/tree/055866ad5515037c724a529fecb2d3c2b35b2075)  
+[glob](https://github.com/isaacs/node-glob/tree/8315c2d576f9f3092cdc2f2cc41a398bc656035a)  
+[pull-stream](https://github.com/pull-stream/pull-stream/tree/29b4868bb3864c427c3988855c5d65ad5cb2cb1c)  
+[simple-statistics](https://github.com/simple-statistics/simple-statistics/tree/31f037dd5550d554c4a96c3ee35b12e10a1c9cb7)  
+[plural](https://github.com/swang/plural/tree/f0027d66ecb37ce0108c8bcb4a6a448d1bf64047)  
+[node-jsonfile](https://github.com/jprichardson/node-jsonfile/tree/9c6478a85899a9318547a6e9514b0403166d8c5c)  
+[fs-extra](https://github.com/jprichardson/node-fs-extra/tree/6bffcd81881ae474d3d1765be7dd389b5edfd0e0)  
+[node-uneval](https://github.com/chakrit/node-uneval/tree/7578dc67090f650a171610a08ea529eba9d27438)  
+[rsvp.js](https://github.com/tildeio/rsvp.js/tree/21e0c9720e08ffa53d597c54fed17119899a9a83)  
+[node-dir](https://github.com/fshost/node-dir/tree/a57c3b1b571dd91f464ae398090ba40f64ba38a2)  
+[memfs](https://github.com/streamich/memfs/tree/ec83e6fe1f57432eac2ab61c5367ba9ec3a775a1)  
+[omnitool](https://gitlab.com/comfort-stereo/omnitool/tree/0edf7d148337051c7c2307738423f0ff3db494c7)  
+[gitlab-js](https://gitlab.com/nerd-vision/opensource/gitlab-js/tree/c2c9ef54b1ea0fc82b284bc72dc2ff0935983f4c)  
+[image-downloader](https://gitlab.com/demsking/image-downloader/tree/19a53f652824bd0c612cc5bcd3a2eb173a16f938)  
+[crawler-url-parser](https://gitlab.com/autokent/crawler-url-parser/tree/202c5b25ad693d284804261e2b3815fe66e0723e)  
+[spacl-core](https://gitlab.com/cptpackrat/spacl-core/tree/fcb8511a0d01bdc206582cfacb3e2b01a0288f6a)
 
-Note that this assumes that package dependencies are installed and any build
-steps have been run (e.g., using `npm i` and `npm run build`). TestPilot also
-relies on `mocha`, so if the package under test does not already depend on it,
-you must install it separately, for example using the command `npm i --no-save
-mocha`.
-
-### Running on Actions
-
-The `run-experiment.yml` workflow runs an experiment on GitHub Actions,
-producing the final report as an artifact you can download. The `results-all`
-artifact contains the results of all packages, while the other artifacts contain
-the individual results of each package.
-
-### Reproducing results
-
-The results of TestPilot are non-deterministic, so even if you run it from the
-same package on the same machine multiple times, you will get different results.
-However, the benchmarking harness records enough data to be able to replay a
-benchmark run in many cases.
-
-To do this, use the `--api` and `--responses` options to reuse the API listings
-and responses from a previous run:
+Execute os comandos em cada repositório:
 
 ```sh
-node benchmark/run.js --outputDir <report_dir> --package <package_dir> --api <api.json> --responses <prompts.json>
+npm i
+npm i -D mocha # or npm i --no-save mocha
 ```
 
-Note that by default replay will fail if any of the prompts are not found in the
-responses file. This typically happens if TestPilot is refining failing tests,
-since in this case the prompt to the model depends on the exact failure message,
-which can be system-specific (e.g., containing local file-system paths), or
-depend on the Node.js version or other factors.
+### 3. Recupere o caminho e teste se é válido
 
-To work around these limitations, you can pass the `--strictResponses false`
-flag handle treat missing prompts by treating them as getting no response from
-the model. This will not, in general, produce the same results as the initial
-run, but suffices in many cases.
+Estando no diretório do testpilot, execute os comandos:
 
-### Analyzing results
+```sh
+output_path="$(pwd)/../outputs/<model>/<package_name>"
+echo "$output_path"
+package_path="$(pwd)/../repositories/<package_name>"
+test -f "$package_path/package.json" && echo "OK: package.json encontrado"
+```
 
-The CodeQL queries in `ql/queries` can be used to analyze the results of running
-an experiment. See `ql/CodeQL.md` for instructions on how to setup CodeQL and
-run the queries.
+### 4. Executar o Test Pilot
 
-## License
+Volte no diretório do test pilot e execute o comando:
 
-This project is licensed under the terms of the MIT open source license. Please refer to [MIT](./LICENSE.txt) for the full terms.
+```sh
+npm run build && node benchmark/run.js --outputDir "$output_path" --package "$package_path"
+```
 
-## Maintainers
+O outputDir é o caminho que você deseja salvar o resultado e o package é o caminho absoluto do package que salvamos no passo 3. 
 
-- Max Schaefer (@max-schaefer)
-- Frank Tip (@franktip)
-- Sarah Nadi (@snadi)
 
-## Support
+### 5. Analise dos resultados
 
-TestPilot is a research prototype and is not officially supported. However, if
-you have questions or feedback, please file an issue and we will do our best to
-respond.
+Instale o CodeQL CLI como descrito na [documentação](https://docs.github.com/en/code-security/codeql-cli/getting-started-with-the-codeql-cli/setting-up-the-codeql-cli).
 
-## Acknowledgement
+Na pasta ./ql, execute `codeql pack install` para instalar as bibliotecas para JavaScript.
 
-We thank Aryaz Eghbali (@aryaze) for his work on the initial version of
-TestPilot.
+Estando na pasta raíz, execute os seguintes comandos para gerar o database:
+```sh
+
+export dbdir="$(pwd)/db"
+export artifact_dir="$(pwd)/outputs/gpt41"
+LGTM_INDEX_FILTERS='include:**/*.json
+    exclude:**/coverageData/**/*.json' codeql database create --overwrite -l javascript --source-root $artifact_dir -- $dbdir
+```
+
+Depois execute o .ql que você deseja:
+```sh
+codeql query run ./testpilot/ql/queries/<any.ql> --database="$dbdir"
+```
+
+---
+
+## 📊 Resultados
+
+Na pasta [***google drive***](https://drive.google.com/drive/folders/1wtwI5hYb52TZ9J7VaabIqCiMG14gBQHN?usp=sharing) encontra-se arquivos compactados organizados do resultado de execução com o modelo gpt-5.4. Contém todas as execuções realizadas pela ferramenta **TestPilot** para as diferentes bibliotecas analisadas utilizando esse modelo.
+
+Esses arquivos compactados representam as saídas brutas dos experimentos e servem como base para a construção da base de dados do estudo. Após a descompactação dos arquivos e a criação da base de dados, seguindo os procedimentos descritos anteriormente, é possível extrair os resultados apresentados neste TCC por meio das métricas descritas a seguir.
+
+### **Testes válidos**
+
+Para cada biblioteca avaliada, os resultados dos testes gerados encontram-se organizados em uma pasta específica, a qual contém um arquivo denominado `report.json`. Nesse arquivo, o objeto principal inclui a propriedade `stats`, responsável por armazenar estatísticas relacionadas à execução dos testes, conforme o padrão ilustrado a seguir:
+
+```json
+{
+  ...
+  "stats": {
+    "nrTests": 98,
+    "nrPasses": 21,
+    "nrFailures": 77,
+    "nrPending": 0,
+    "nrOther": 0,
+    "apiExplorationTime": 2.3451609999999903,
+    "docCommentExtractionTime": 12.475443000000013,
+    "snippetExtractionTime": 4.031181000000004,
+    "codexQueryTime": 279599.72940000007,
+    "totalTime": 352849.837028
+  }
+  ...
+}
+```
+
+### **Cobertura de código**
+
+No mesmo arquivo report.json, encontra-se também a propriedade coverage, que armazena as métricas de cobertura de código obtidas a partir da execução dos testes gerados. Essas métricas incluem cobertura de linhas, instruções, funções e ramos, conforme exemplificado a seguir:
+
+```json
+{
+  ...
+  "coverage": {
+    "total": {
+      "lines": {
+        "total": 136,
+        "covered": 113,
+        "skipped": 0,
+        "pct": 83.08
+      },
+      "statements": {
+        "total": 143,
+        "covered": 119,
+        "skipped": 0,
+        "pct": 83.21
+      },
+      "functions": {
+        "total": 31,
+        "covered": 27,
+        "skipped": 0,
+        "pct": 87.09
+      },
+      "branches": {
+        "total": 88,
+        "covered": 54,
+        "skipped": 0,
+        "pct": 61.36
+      }
+      ...
+    }
+    ...
+  }
+  ...
+}
+```
